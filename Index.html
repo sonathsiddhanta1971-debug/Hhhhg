@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Shape Ball Animation</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background-color: #f0f0f0;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+        }
+        #info {
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Sides: <span id="sides-count">3</span> | Speed: <span id="speed-display">2</span></div>
+    <canvas id="animationCanvas" width="500" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('animationCanvas');
+        const ctx = canvas.getContext('2d');
+        const sidesCountDisplay = document.getElementById('sides-count');
+        const speedDisplay = document.getElementById('speed-display');
+
+        const CANVAS_WIDTH = canvas.width;
+        const CANVAS_HEIGHT = canvas.height;
+        const BALL_RADIUS = 10;
+        const SPEED_INCREASE_FACTOR = 1.1; // Increase speed by 10% on collision
+        const INITIAL_SPEED = 2;
+
+        let sides = 3;
+        let ball = {
+            x: CANVAS_WIDTH / 2,
+            y: CANVAS_HEIGHT / 2,
+            dx: INITIAL_SPEED,
+            dy: INITIAL_SPEED
+        };
+        let speed = INITIAL_SPEED;
+
+        // Function to generate vertices for a regular polygon
+        function createPolygonVertices(sides, radius, centerX, centerY) {
+            const vertices = [];
+            for (let i = 0; i < sides; i++) {
+                const angle = (i * 2 * Math.PI / sides) - Math.PI / 2; // Start from top
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                vertices.push({ x, y });
+            }
+            return vertices;
+        }
+
+        // Function to draw the current polygon
+        function drawPolygon(vertices) {
+            ctx.beginPath();
+            ctx.moveTo(vertices[0].x, vertices[0].y);
+            for (let i = 1; i < vertices.length; i++) {
+                ctx.lineTo(vertices[i].x, vertices[i].y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = 'blue';
+            ctx.stroke();
+        }
+
+        // Function to draw the ball
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // Function to check for collision with any edge of the polygon
+        function checkCollision(ball, vertices) {
+            for (let i = 0; i < vertices.length; i++) {
+                const p1 = vertices[i];
+                const p2 = vertices[(i + 1) % vertices.length]; // Next vertex, loop back to first
+                
+                // Vector of the edge (p1 to p2)
+                const edgeX = p2.x - p1.x;
+                const edgeY = p2.y - p1.y;
+                
+                // Vector from p1 to ball
+                const ballX = ball.x - p1.x;
+                const ballY = ball.y - p1.y;
+
+                // Project ball onto edge normal to find closest point
+                // Normal vector to the edge (perpendicular)
+                const normalX = -edgeY;
+                const normalY = edgeX;
+                const length = Math.sqrt(normalX * normalX + normalY * normalY);
+                const unitNormalX = normalX / length;
+                const unitNormalY = normalY / length;
+
+                // Distance from ball to the edge (signed)
+                const dist = ballX * unitNormalX + ballY * unitNormalY;
+
+                // Check if ball is close enough to the edge for a collision (within radius)
+                if (Math.abs(dist) < BALL_RADIUS) {
+                    // Check if the projection is within the edge segment boundaries (simple AABB check for edge for simplicity)
+                    // This simple check might not be perfect for all cases but works for this
+                    const dot = (ballX * edgeX + ballY * edgeY) / (length * length);
+                    if (dot >= 0 && dot <= 1) {
+                        return { collided: true, normalX: unitNormalX, normalY: unitNormalY };
+                    }
+                }
+            }
+            return { collided: false };
+        }
+
+        // Main animation loop
+        function animate() {
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); // Clear canvas
+
+            const polygonVertices = createPolygonVertices(sides, CANVAS_WIDTH / 2 - 20, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+            drawPolygon(polygonVertices);
+            drawBall();
+
+            // Check collision and update ball velocity
+            const collisionInfo = checkCollision(ball, polygonVertices);
+
+            if (collisionInfo.collided) {
+                // Increase speed
+                speed *= SPEED_INCREASE_FACTOR;
+                ball.dx *= SPEED_INCREASE_FACTOR;
+                ball.dy *= SPEED_INCREASE_FACTOR;
+
+                // Reflect velocity
+                // R = V - 2 * (V . N) * N, where V is velocity, N is unit normal
+                const dotProduct = ball.dx * collisionInfo.normalX + ball.dy * collisionInfo.normalY;
+                ball.dx = ball.dx - 2 * dotProduct * collisionInfo.normalX;
+                ball.dy = ball.dy - 2 * dotProduct * collisionInfo.normalY;
+
+                // Move ball slightly off the edge to prevent sticking
+                ball.x += ball.dx * 0.1;
+                ball.y += ball.dy * 0.1;
+
+                // Add a side to the shape
+                sides++;
+                sidesCountDisplay.textContent = sides;
+                speedDisplay.textContent = speed.toFixed(2);
+            }
+
+            // Update ball position
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            requestAnimationFrame(animate); // Create animation loop
+        }
+
+        // Start the animation
+        animate();
+    </script>
+</body>
+</html>
